@@ -75,5 +75,9 @@ async def register_sessions(settings) -> bool | None:
     with open(f'sessions/{session_name}/user-agent.txt', 'w') as f:
         f.write(user_agent)
 
+    # Save proxy
+    with open(f'sessions/{session_name}/proxy.txt', 'w') as f:
+        f.write(str(proxy))
+
     logger.success(f'Session added successfully @{user_data.username} | id:{user_data.id}')
     return True

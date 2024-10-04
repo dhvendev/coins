@@ -20,6 +20,9 @@ class Proxy:
         self.username = username
         self.password = password
 
+    def __str__(self) -> str:
+        return f"{self.scheme}://{self.username}:{self.password}@{self.hostname}:{self.port}"
+
     def parse_proxy(self, proxy_input: str) -> bool:
         regex = r'^(?P<scheme>socks5|socks4|http)://(?:(?P<username>[^:]+)(?::(?P<password>[^@]+))?@)?(?P<hostname>[^:\/]+):(?P<port>[0-9]{1,5})$'
         match = re.match(regex, proxy_input)

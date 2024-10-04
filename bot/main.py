@@ -1,5 +1,6 @@
 from bot.core.session_tg_creater import register_sessions
 from bot.utils.logger import logger
+from bot.core.main import Bot
 
 async def main_process(settings) -> None:
     logger.info("Start prepareting sessions")
@@ -43,3 +44,8 @@ async def main_process(settings) -> None:
                 logger.info("Stop creating sessions")
                 break
             logger.info("Register another session")
+
+    # Start bot command
+    if command == 2:
+        logger.info("Start bot")
+        await Bot().start()
