@@ -48,4 +48,5 @@ async def main_process(settings) -> None:
     # Start bot command
     if command == 2:
         logger.info("Start bot")
-        await Bot().start()
+        bot = Bot(settings)
+        await bot.start()
