@@ -5,13 +5,14 @@ from bot.utils.proxy import Proxy
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 
     API_ID: int
     API_HASH: str
 
-    REF_ID: int = 123456789
+    REF_ID: int = 12345678 # your ref id
     REF_LINK: str = f"https://t.me/BybitCoinsweeper_Bot?start=referredBy={REF_ID}"
 
     CHANCE_TO_WIN: int = 80

@@ -1,5 +1,7 @@
+import asyncio
 from pyrogram import Client
 import os
+from bot.core.gamer import run_gamer
 from bot.utils.logger import logger
 from bot.utils.proxy import Proxy
 from bot.utils.headers import headers_example
@@ -10,7 +12,15 @@ class Bot:
         self.tg_sessios: list[tuple[Client, Proxy, str]] = [] # (client: Client, proxy: Proxy, user-agent: str)
 
     
-    async def collect_sessions(self):
+    async def collect_sessions(self) -> None:
+        """
+        Collect sessions from sessions folder.
+
+        :raises ValueError: If API_ID or API_HASH is not set in .env file
+        :raises FileNotFoundError: If no sessions found in sessions folder
+        :return: None
+        :rtype: None
+        """
         if not self.settings.API_ID or not self.settings.API_HASH:
             raise ValueError("API_ID and API_HASH must be set in .env file")
 
@@ -59,3 +69,5 @@ class Bot:
             logger.error("No sessions found")
             return
         logger.info(f"Starting bot | Total: {len(self.tg_sessios)}")
+        tasks = [asyncio.create_task(run_gamer(tg_session=tg_session, settings=self.settings)) for tg_session in self.tg_sessios]
+        await asyncio.gather(*tasks)

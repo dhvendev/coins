@@ -44,13 +44,15 @@ class Proxy:
             "password": self.password, 
         }
     
+    def get_connector(self) -> ProxyConnector:
+        connector = ProxyConnector(proxy_type=ProxyType(self.scheme),
+                                    host=self.hostname, port=self.port,
+                                    username=self.username, password=self.password)
+        return connector
+    
     async def check_proxy(self, headers: dict) -> bool:
         try:
-            connector = ProxyConnector(proxy_type=ProxyType(self.scheme),
-                                        host=self.hostname, port=self.port,
-                                        username=self.username, password=self.password)
-            client = CloudflareScraper(headers=headers, connector=connector)
-            async with CloudflareScraper(headers=headers, connector=connector) as client:
+            async with CloudflareScraper(headers=headers, connector=self.get_connector()) as client:
                 async with client.get(url='http://ip-api.com/json/') as response:
                     result = await response.json()
                     ip = result.get('query', None)
@@ -61,4 +63,5 @@ class Proxy:
         except Exception as error:
             logger.error(f"Proxy check failed | Error: {error}")
             return False
+        
     
