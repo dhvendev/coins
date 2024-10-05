@@ -42,6 +42,12 @@ class Gamer:
         self.last_name = ""
 
     async def get_new_tokens(self, session: CloudflareScraper) -> bool:
+        """
+        Refreshes the access and refresh tokens.
+
+        :param session: The session to use to make the request
+        :return: True if the tokens were successfully refreshed, False otherwise
+        """
         payload = {"refreshToken": str(self.refresh_token)}
         try:
             async with session.post("https://api.bybitcoinsweeper.com/api/auth/refresh-token", headers=self.headers, json=payload) as res:
@@ -61,6 +67,12 @@ class Gamer:
             return False
         
     async def tg_connect(self, ref_param: str):
+        """
+        Connects to Telegram and sends the /start command to the bot.
+
+        :param ref_param: The referral parameter to pass to the bot
+        :raises InvalidStartBot: If the connection to Telegram fails
+        """
         try:
             await self.tg_session.connect()
             start_command_found = False
@@ -80,9 +92,15 @@ class Gamer:
                     )
                 )
         except (Unauthorized, UserDeactivated, AuthKeyUnregistered) as e:
-            raise InvalidStartBot(e)
+            raise InvalidStartBot(e)    
     
     async def get_tg_web_data(self) -> str:
+        """
+        Connects to Telegram and sends the /start command to the bot.
+        Extracts auth token from the URL and extracts the user data from it.
+        Disconnects from Telegram after finishing.
+        :return: The extracted user data
+        """
         ref_param = f"referredBy={self.settings.REF_ID}"
         self.ref_id = str(self.settings.REF_ID)
         try:
@@ -128,6 +146,12 @@ class Gamer:
             await asyncio.sleep(delay=3)
 
     async def login_tg_web_app(self, session: CloudflareScraper):
+        """
+        Logs into the BybitCoinsweeper API using the previously obtained initData and the ref_id.
+
+        :param session: The session to use for making the request
+        :raises Exception: If an unknown error occurs while trying to login
+        """
         try:
             payload = { 
                 "initData": self.auth_token,
@@ -195,6 +219,13 @@ class Gamer:
 
 
 async def run_gamer(tg_session: tuple[Client, Proxy, str], settings) -> None:
+    """
+    Starts a Gamer instance and waits for a random time between 1-5 seconds before doing so.
+    
+    Args:
+        tg_session (tuple[Client, Proxy, str]): A tuple containing a Client instance, a Proxy instance and a User-Agent string.
+        settings (Settings): The settings to use for this Gamer instance.
+    """
     tg_session, proxy, user_agent = tg_session
     gamer = Gamer(tg_session=tg_session, settings=settings, proxy=proxy, user_agent=user_agent)
     try:
