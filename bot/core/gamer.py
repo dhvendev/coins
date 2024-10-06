@@ -55,6 +55,23 @@ class Gamer:
     def calc(i, s, a, o, d, g):
         st = (10 * i + max(0, 1200 - 10 * s) + 2000) * (1 + o / a) / 10
         return math.floor(st) + Gamer.value(g)
+    
+    async def night_sleep_check(self):
+        if bool(self.settings.NIGHT_SLEEP):
+            time_now = datetime.now()
+
+            # Start and end of the day
+            sleep_start = time_now.replace(hour=0, minute=0, second=0, microsecond=0)  # 00:00 ночи
+            sleep_end = time_now.replace(hour=8, minute=0, second=0, microsecond=0)    # 08:00 утра
+
+            if time_now >= sleep_start and time_now <= sleep_end:
+                time_to_sleep = (sleep_end - time_now).total_seconds()
+                wake_up_time = time_to_sleep + randint(0, 3600)
+
+                logger.info(f"{self.name} | Sleep until {sleep_end.strftime('%H:%M')}")
+                await asyncio.sleep(wake_up_time)
+
+            logger.info(f"{self.name} | Sleep cancelled | Now start the game")
 
     async def get_new_tokens(self, session: CloudflareScraper) -> bool:
         """
@@ -66,7 +83,7 @@ class Gamer:
         payload = {"refreshToken": str(self.refresh_token)}
         try:
             async with session.post("https://api.bybitcoinsweeper.com/api/auth/refresh-token", headers=self.headers, json=payload) as res:
-                if await res.status == 201:
+                if res.status == 201:
                     token = await res.json()
                     self.headers['Authorization'] = f"Bearer {token['accessToken']}"
                     self.access_token = token['accessToken']
@@ -275,6 +292,7 @@ class Gamer:
 
         async with client as session:
             attempt_refresh_token = 0
+            periods = 0
             while True:
                 # Get new tokens
                 try:
@@ -319,6 +337,8 @@ class Gamer:
                                 attempt_get_me += 1
                                 logger.warning(f"Account {self.name} | Failed to get me info| New attempt after 1 second")
                                 await asyncio.sleep(1)
+                            logger.error(f"Account {self.name} | Failed to get me info | Exiting account")
+                            break
                         
                         attempt_play = randint(self.settings.ROUND_COUNT_EACH_GAME[0], self.settings.ROUND_COUNT_EACH_GAME[1])
                         while attempt_play > 0:
@@ -353,9 +373,21 @@ class Gamer:
 
                             logger.info(f"Account {self.name} | New attempt after sleep 15-25s")
                             await asyncio.sleep(randint(15, 25))
-                    sleep = randint(500, 1000)
-                    logger.info(f"Account {self.name} | All attempts finished  | Sleep {sleep}s...")
-                    await asyncio.sleep(sleep)
+                    periods += 1
+
+                    if periods == 3:
+                        sleep = randint(3600, 3600 * 3)
+                        logger.info(f"Account {self.name} | Antifrost period | Sleep {sleep}s...")
+                        await asyncio.sleep(sleep)
+                        periods = 0
+                    else:
+                        sleep = randint(200, 1000)
+                        logger.info(f"Account {self.name} | All attempts finished  | Sleep {sleep}s...")
+                        await asyncio.sleep(sleep)
+
+                    # Sleep until next night
+                    await self.night_sleep_check()
+
                 except Exception as e:
                     traceback.print_exc()
                     logger.error(f"Account {self.name} | Error: {e}")

@@ -14,8 +14,8 @@ class Settings(BaseSettings):
 
     REF_ID: int = 12345678 # your ref id
     REF_LINK: str = f"https://t.me/BybitCoinsweeper_Bot?start=referredBy={REF_ID}"
-
     CHANCE_TO_WIN: int = 80
+    NIGHT_SLEEP: int = 1
 
     ROUND_COUNT_EACH_GAME: list[int] = [2, 5]        # in rounds for each game
     TIME_TO_PLAY_EACH_GAME: list[int] = [30, 90]     # in seconds for each game
