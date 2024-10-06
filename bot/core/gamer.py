@@ -1,17 +1,22 @@
 import asyncio
+import hashlib
+import hmac
+import math
 from time import time
 import traceback
 from pyrogram import Client
 from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, FloodWait
 from pyrogram.raw import functions
 from pyrogram.raw.functions.messages import RequestWebView
+import pytz
 from bot.utils.logger import logger
 from bot.utils.proxy import Proxy
 from bot.utils.headers import headers_example
 from aiocfscrape import CloudflareScraper
 from pydantic_settings import BaseSettings
-from random import randint
+from random import randint, uniform
 from urllib.parse import unquote
+from datetime import datetime
 
 class InvalidStartBot(BaseException):
     ...
@@ -40,6 +45,16 @@ class Gamer:
         self.user_id = ""
         self.first_name = ""
         self.last_name = ""
+        self.user_id = ""
+
+    @staticmethod
+    def value(i):
+        return sum(ord(o) for o in list(i)) / 1e5
+
+    @staticmethod
+    def calc(i, s, a, o, d, g):
+        st = (10 * i + max(0, 1200 - 10 * s) + 2000) * (1 + o / a) / 10
+        return math.floor(st) + Gamer.value(g)
 
     async def get_new_tokens(self, session: CloudflareScraper) -> bool:
         """
@@ -168,6 +183,87 @@ class Gamer:
         except Exception as e:
             logger.error(f"{self.name} | Unknown error while trying to login: {e}")
 
+    async def game_start(self, session: CloudflareScraper):
+        async with session.post("https://api.bybitcoinsweeper.com/api/games/start", headers=self.headers, json={}) as res:
+            if res.status == 401:
+                await self.get_new_tokens(session)
+                return None
+            return await res.json()
+        
+    async def get_me(self, session: CloudflareScraper):
+        try:
+            async with session.get("https://api.bybitcoinsweeper.com/api/users/me", headers=self.headers) as res:
+                if res.status != 200:
+                    logger.warning(f"{self.name} | <yellow>Get user info failed: {res.status} | {res.json()}</yellow>")
+                    return False
+                user = await res.json()
+                self.user_id = user['id']
+                logger.info(f"{self.name} | Balance: <light-yellow>{user['score']}</light-yellow>")
+                return True
+        except Exception as e:
+            logger.error(f"Account (get_me) {self.name} | Error: {e}")
+            return False
+        
+    async def lose_round(self, session: CloudflareScraper, game_data: dict):
+        game_id = game_data['id']
+        bagcoins = game_data['rewards']['bagCoins']
+        bits = game_data['rewards']['bits']
+        gifts = game_data['rewards']['gifts']
+        logger.info(f"Successfully started game: <light-blue>{game_id}</light-blue>")
+        sleep = uniform(self.settings.TIME_TO_PLAY_EACH_GAME[0], self.settings.TIME_TO_PLAY_EACH_GAME[1])
+        logger.info(f"{self.name} | Wait <cyan>{sleep}s</cyan> to complete game...")
+        await asyncio.sleep(sleep)
+        payload = {
+            "bagCoins": bagcoins,
+            "bits": bits,
+            "gameId": game_id,
+            "gifts": gifts
+        }
+        async with session.post("https://api.bybitcoinsweeper.com/api/games/lose", headers=self.headers ,json=payload) as res:
+            if res.status == 201:
+                logger.info(f"{self.name} | <red>Lose game: </red><cyan>{game_id}</cyan> <red>:(</red>")
+                await self.get_me(session)
+            elif res.status == 401:
+                await self.get_new_tokens(session)
+
+    async def win_round(self, session: CloudflareScraper, game_data: dict):
+        started_at = game_data['createdAt']
+        game_id = game_data['id']
+        bagcoins = game_data['rewards']['bagCoins']
+        bits = game_data['rewards']['bits']
+        gifts = game_data['rewards']['gifts']
+        logger.info(f"Successfully started game: <light-blue>{game_id}</light-blue>")
+        sleep = uniform(self.settings.TIME_TO_PLAY_EACH_GAME[0], self.settings.TIME_TO_PLAY_EACH_GAME[1])
+        logger.info(f"{self.name} | Wait <cyan>{sleep}s</cyan> to complete game...")
+        await asyncio.sleep(sleep)
+        unix_time_started = datetime.strptime(started_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+        unix_time_started = unix_time_started.replace(tzinfo=pytz.UTC)
+        unix_time_ms = int(unix_time_started.timestamp() * 1000)
+        timeplay = sleep
+        self.user_id += "v$2f1"
+        mr_pl = f"{game_id}-{unix_time_ms}"
+        lr_pl = Gamer.calc(i=45,s=timeplay,a=54,o=9,d=True,g=game_id)
+        xr_pl = f"{self.user_id}-{mr_pl}"
+        kr_pl = f"{timeplay}-{game_id}"
+        _r = hmac.new(xr_pl.encode('utf-8'), kr_pl.encode('utf-8'), hashlib.sha256).hexdigest()
+        payload = {
+            "bagCoins": bagcoins,
+            "bits": bits,
+            "gameId": game_id,
+            "gameTime": timeplay,
+            "gifts": gifts,
+            "h": _r,
+            "score": lr_pl
+        }
+        async with session.post("https://api.bybitcoinsweeper.com/api/games/win", json=payload, headers=self.headers) as res:
+            if res.status == 201:
+                logger.info(
+                    f"{self.name} | <green> Won game : </green><cyan>{game_id}</cyan> | Earned <yellow>{int(lr_pl)}</yellow>")
+                await self.get_me(session)
+            elif res.status == 401:
+                self.get_new_tokens(session)
+                return False
+            return True
     async def start(self):
         logger.info(f"Account {self.name} | started")
         
@@ -187,7 +283,7 @@ class Gamer:
                     if current_time - self.jwt_token_create_time >= self.jwt_live_time :
                         if self.logged:
                             logger.info(f"{self.name} | Access token expired,  refreshing token.")
-                            res = await self.refresh_token(session)
+                            res = await self.get_new_tokens(session)
                             if not res:
                                 logger.error(f"{self.name} | Starting new attempt")
                                 attempt_refresh_token += 1
@@ -209,13 +305,60 @@ class Gamer:
                         self.token_live_time = randint(3500, 3600)    # Reset token live time
                         
                     self.logged = True
+
+
+                    if self.logged:
+                        try: 
+                            await self.get_me(session)
+                        except:
+                            attempt_get_me = 0
+                            while attempt_get_me < 3:
+                                self.refresh_token(session)
+                                if await self.get_me(session):
+                                    break
+                                attempt_get_me += 1
+                                logger.warning(f"Account {self.name} | Failed to get me info| New attempt after 1 second")
+                                await asyncio.sleep(1)
+                        
+                        attempt_play = randint(self.settings.ROUND_COUNT_EACH_GAME[0], self.settings.ROUND_COUNT_EACH_GAME[1])
+                        while attempt_play > 0:
+                            attempt_play -= 1
+                            if randint(1, 100) > self.settings.CHANCE_TO_WIN:
+                                try:
+                                    game_data = await self.game_start(session)
+                                    if not game_data:
+                                        logger.error(f"Account {self.name} | Failed to start game | New attempt after 1 second")
+                                        await asyncio.sleep(1)
+                                        continue
+                                    await self.lose_round(session, game_data)
+                                except Exception as e:
+                                    logger.warning(f"{self.name} | Unknown error while trying to play game: {e}")
+                                    await asyncio.sleep(1)
+                            else:
+                                try:
+                                    game_data = await self.game_start(session)
+                                    if not game_data:
+                                        logger.error(f"Account {self.name} | Failed to start game | New attempt after 1 second")
+                                        await asyncio.sleep(1)
+                                        continue
+                                    res = await self.win_round(session, game_data)
+                                    if not res:
+                                        logger.error(f"Account {self.name} | Failed to win game | New attempt after 1 second")
+                                        await asyncio.sleep(1)
+                                        continue
+                                except Exception as e:
+                                    logger.warning(f"{self.name} | Unknown error while trying to play game: {e} - Sleep 20s")
+                                    traceback.print_exc()
+                                    await asyncio.sleep(20)
+
+                            logger.info(f"Account {self.name} | New attempt after sleep 15-25s")
+                            await asyncio.sleep(randint(15, 25))
+                    sleep = randint(500, 1000)
+                    logger.info(f"Account {self.name} | All attempts finished  | Sleep {sleep}s...")
+                    await asyncio.sleep(sleep)
                 except Exception as e:
                     traceback.print_exc()
                     logger.error(f"Account {self.name} | Error: {e}")
-
-                break
-
-
 
 
 async def run_gamer(tg_session: tuple[Client, Proxy, str], settings) -> None:

@@ -4,3 +4,4 @@ aiohttp-proxy==0.1.2
 loguru==0.7.2
 pydantic-settings==2.5.2
 Pyrogram==2.0.106
+pytz==2024.2
