@@ -1,7 +1,5 @@
-
 # BybitCoinsweeper 
 
-❌ Now project editing, it is not working
 
 This bot working for automatic claim coins. 
 This bot has been redesigned and improved for me.
