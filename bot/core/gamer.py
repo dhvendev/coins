@@ -278,10 +278,23 @@ class Gamer:
                     f"{self.name} | <green> Won game : </green><cyan>{game_id}</cyan> | Earned <yellow>{int(lr_pl)}</yellow>")
                 await self.get_me(session)
             elif res.status == 401:
-                self.get_new_tokens(session)
+                await self.get_new_tokens(session)
                 return False
             return True
     async def start(self):
+        """
+        Main function to start the bot.
+
+        This function will start the bot and enter an infinite loop where it will
+        try to play the game, win rounds, and get coins. It will also refresh the
+        access token and JWT token when they expire.
+
+        It will also check for the antifrost period and sleep accordingly.
+
+        If an error occurs, it will print the error and exit the account.
+
+        :return: None
+        """
         logger.info(f"Account {self.name} | started")
         
         connector = self.proxy.get_connector() if self.proxy else None
